@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --brand-1: #9333ea;
+  --brand-2: #7c3aed;
+  --brand-glow: rgba(147, 51, 234, 0.2);
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes floatBlob {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(22px, -18px) scale(1.06); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes softPulse {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+
+.app-gradient-bg {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-gradient-bg::before,
+.app-gradient-bg::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  filter: blur(44px);
+  border-radius: 9999px;
+  animation: floatBlob 14s ease-in-out infinite;
+}
+
+.app-gradient-bg::before {
+  width: 340px;
+  height: 340px;
+  top: -110px;
+  right: 8%;
+  background: radial-gradient(circle at center, rgba(167, 139, 250, 0.36), rgba(167, 139, 250, 0));
+}
+
+.app-gradient-bg::after {
+  width: 280px;
+  height: 280px;
+  bottom: 4%;
+  left: -70px;
+  animation-delay: -4s;
+  background: radial-gradient(circle at center, rgba(129, 140, 248, 0.24), rgba(129, 140, 248, 0));
+}
+
+main > * {
+  animation: fadeSlideUp 420ms ease-out both;
+}
+
+.interactive-surface {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.interactive-surface:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px -20px var(--brand-glow);
+}
+
+.brand-pulse {
+  animation: softPulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}

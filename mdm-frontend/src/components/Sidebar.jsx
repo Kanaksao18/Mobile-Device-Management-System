@@ -45,6 +45,7 @@ function SidebarContent({ onClose }) {
           <NavLink
             key={item.path}
             to={item.path}
+            end
             onClick={onClose}
             className={({ isActive }) =>
               `interactive-surface block rounded-lg px-3 py-2 text-sm font-medium transition duration-200 ${

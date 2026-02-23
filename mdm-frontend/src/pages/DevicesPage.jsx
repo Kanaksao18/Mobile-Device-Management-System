@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Pagination from '../components/Pagination'
 
 function DevicesPage() {
   const [loading, setLoading] = useState(true)
   const [devices, setDevices] = useState([])
   const [search, setSearch] = useState('')
   const [region, setRegion] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -32,6 +35,22 @@ function DevicesPage() {
       return matchRegion && matchSearch
     })
   }, [devices, region, search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, region])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [filtered.length, page, pageSize])
+
+  const paginatedDevices = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
 
   if (loading) {
     return <LoadingSpinner label="Loading devices..." />
@@ -61,7 +80,7 @@ function DevicesPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((device, index) => (
+            {paginatedDevices.map((device, index) => (
               <tr key={device.id || device.imei || index} className="border-t border-slate-200 dark:border-slate-700">
                 <td className="px-4 py-3">{device.imei || '-'}</td>
                 <td className="px-4 py-3">{device.model || '-'}</td>
@@ -83,6 +102,16 @@ function DevicesPage() {
             )}
           </tbody>
         </table>
+        <Pagination
+          totalItems={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+        />
       </div>
     </section>
   )

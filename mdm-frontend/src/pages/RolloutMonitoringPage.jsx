@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import api from '../services/api'
+import Pagination from '../components/Pagination'
 
 function RolloutMonitoringPage() {
   const [scheduleId, setScheduleId] = useState('')
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchRows = async (selectedScheduleId) => {
     if (!selectedScheduleId) {
@@ -25,6 +28,22 @@ function RolloutMonitoringPage() {
   useEffect(() => {
     fetchRows(scheduleId)
   }, [scheduleId])
+
+  useEffect(() => {
+    setPage(1)
+  }, [scheduleId])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, pageSize, rows.length])
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, page, pageSize])
 
   return (
     <section className="space-y-4">
@@ -46,7 +65,7 @@ function RolloutMonitoringPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
+              {paginatedRows.map((row, index) => (
                 <tr key={row.id || row.deviceId || index} className="border-t border-slate-200 dark:border-slate-700">
                   <td className="px-4 py-3">{row.device || row.deviceId || '-'}</td>
                   <td className="px-4 py-3">{row.currentState || row.state || '-'}</td>
@@ -58,6 +77,16 @@ function RolloutMonitoringPage() {
               )}
             </tbody>
           </table>
+          <Pagination
+            totalItems={rows.length}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(1)
+            }}
+          />
         </div>
       )}
     </section>

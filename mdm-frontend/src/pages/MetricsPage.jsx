@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Pagination from '../components/Pagination'
 
 function toTitleCase(value) {
   return value
@@ -77,6 +78,7 @@ function parseMetricLine(metricPart) {
 }
 
 function parsePrometheus(text) {
+  // Minimal Prometheus text parser for client-side rendering/filtering.
   return text
     .split('\n')
     .map((line) => line.trim())
@@ -107,6 +109,8 @@ function MetricsPage() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
   const [rows, setRows] = useState([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -143,6 +147,23 @@ function MetricsPage() {
       )
     })
   }, [rows, query, category])
+
+  useEffect(() => {
+    // Reset to first page when filter criteria change.
+    setPage(1)
+  }, [query, category])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [filteredRows.length, page, pageSize])
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredRows.slice(start, start + pageSize)
+  }, [filteredRows, page, pageSize])
 
   if (loading) return <LoadingSpinner label="Loading metrics..." />
 
@@ -189,7 +210,7 @@ function MetricsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row) => (
+            {paginatedRows.map((row) => (
               <tr key={row.id} className="border-t border-slate-200 dark:border-slate-700">
                 <td className="px-3 py-2">
                   <div className="font-medium">{row.displayName}</div>
@@ -221,6 +242,17 @@ function MetricsPage() {
             )}
           </tbody>
         </table>
+        <Pagination
+          totalItems={filteredRows.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+          pageSizeOptions={[25, 50, 100]}
+        />
       </div>
     </section>
   )

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Pagination from '../components/Pagination'
 import api from '../services/api'
 
 const initialForm = {
@@ -26,6 +27,8 @@ function RolloutSchedulerPage() {
   const [formData, setFormData] = useState(initialForm)
   const [confirmState, setConfirmState] = useState({ open: false, action: null, scheduleId: null })
   const [actionLoading, setActionLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchData = async () => {
     setLoading(true)
@@ -46,6 +49,17 @@ function RolloutSchedulerPage() {
   }, [])
 
   const versionOptions = useMemo(() => versions.map((version) => version.versionCode || version.versionName).filter(Boolean), [versions])
+  const paginatedSchedules = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return schedules.slice(start, start + pageSize)
+  }, [page, pageSize, schedules])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(schedules.length / pageSize))
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, pageSize, schedules.length])
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -142,7 +156,7 @@ function RolloutSchedulerPage() {
                 </tr>
               </thead>
               <tbody>
-                {schedules.map((schedule, index) => (
+                {paginatedSchedules.map((schedule, index) => (
                   <tr key={schedule.id || schedule.scheduleId || index} className="border-b border-slate-100 dark:border-slate-800">
                     <td className="px-3 py-2">{schedule.id || schedule.scheduleId || '-'}</td>
                     <td className="px-3 py-2">{(schedule.fromVersion || '-') + ' -> ' + (schedule.toVersion || '-')}</td>
@@ -169,6 +183,16 @@ function RolloutSchedulerPage() {
                 )}
               </tbody>
             </table>
+            <Pagination
+              totalItems={schedules.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setPage(1)
+              }}
+            />
           </div>
         )}
       </div>

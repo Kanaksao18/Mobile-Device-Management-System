@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Pagination from '../components/Pagination'
 
 const initialForm = {
   versionCode: '',
@@ -16,6 +17,8 @@ function VersionManagementPage() {
   const [submitting, setSubmitting] = useState(false)
   const [versions, setVersions] = useState([])
   const [formData, setFormData] = useState(initialForm)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchVersions = async () => {
     setLoading(true)
@@ -32,6 +35,18 @@ function VersionManagementPage() {
   useEffect(() => {
     fetchVersions()
   }, [])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(versions.length / pageSize))
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, pageSize, versions.length])
+
+  const paginatedVersions = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return versions.slice(start, start + pageSize)
+  }, [versions, page, pageSize])
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target
@@ -87,7 +102,7 @@ function VersionManagementPage() {
                 </tr>
               </thead>
               <tbody>
-                {versions.map((version, index) => (
+                {paginatedVersions.map((version, index) => (
                   <tr key={version.id || version.versionCode || index} className="border-b border-slate-100 dark:border-slate-800">
                     <td className="px-3 py-2">{version.versionCode || '-'}</td>
                     <td className="px-3 py-2">{version.versionName || '-'}</td>
@@ -101,6 +116,16 @@ function VersionManagementPage() {
                 )}
               </tbody>
             </table>
+            <Pagination
+              totalItems={versions.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setPage(1)
+              }}
+            />
           </div>
         )}
       </div>

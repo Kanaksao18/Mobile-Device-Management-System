@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import api from '../services/api'
+import Pagination from '../components/Pagination'
 
 function AuditLogsPage() {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     const fetchAudit = async () => {
@@ -20,6 +23,18 @@ function AuditLogsPage() {
     fetchAudit()
   }, [])
 
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, pageSize, rows.length])
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, page, pageSize])
+
   if (loading) return <LoadingSpinner label="Loading audit logs..." />
 
   return (
@@ -33,7 +48,7 @@ function AuditLogsPage() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {paginatedRows.map((row, index) => (
             <tr key={row.id || index} className="border-t border-slate-200 dark:border-slate-700">
               <td className="px-4 py-3">{row.actor || '-'}</td>
               <td className="px-4 py-3">{row.action || '-'}</td>
@@ -46,6 +61,16 @@ function AuditLogsPage() {
           )}
         </tbody>
       </table>
+      <Pagination
+        totalItems={rows.length}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size)
+          setPage(1)
+        }}
+      />
     </section>
   )
 }

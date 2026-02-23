@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
   )
 
   useEffect(() => {
+    // Called by API interceptor when backend returns 401.
     setUnauthorizedHandler(() => {
       setToken(null)
       toast.error('Session expired. Please login again.')
@@ -36,6 +37,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticating(true)
       try {
         const response = await api.post('/api/auth/login', { username, password })
+        // Supports multiple backend token field names for compatibility.
         const receivedToken =
           response?.data?.token ||
           response?.data?.jwt ||

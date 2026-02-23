@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Pagination from '../components/Pagination'
 
 const initialForm = {
   fromVersion: '',
@@ -18,6 +19,8 @@ function CompatibilityPage() {
   const [versions, setVersions] = useState([])
   const [rows, setRows] = useState([])
   const [formData, setFormData] = useState(initialForm)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchData = async () => {
     setLoading(true)
@@ -37,7 +40,18 @@ function CompatibilityPage() {
     fetchData()
   }, [])
 
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, pageSize, rows.length])
+
   const versionOptions = useMemo(() => versions.map((version) => version.versionCode || version.versionName).filter(Boolean), [versions])
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return rows.slice(start, start + pageSize)
+  }, [rows, page, pageSize])
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target
@@ -129,7 +143,7 @@ function CompatibilityPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
+                {paginatedRows.map((row, index) => (
                   <tr key={row.id || index} className="border-b border-slate-100 dark:border-slate-800">
                     <td className="px-3 py-2">{row.fromVersion || '-'}</td>
                     <td className="px-3 py-2">{row.toVersion || '-'}</td>
@@ -149,6 +163,16 @@ function CompatibilityPage() {
                 )}
               </tbody>
             </table>
+            <Pagination
+              totalItems={rows.length}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setPage(1)
+              }}
+            />
           </div>
         )}
       </div>

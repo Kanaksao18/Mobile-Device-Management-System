@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -21,37 +21,53 @@ function CompatibilityPage() {
   const [formData, setFormData] = useState(initialForm)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const [fromFilter, setFromFilter] = useState('')
+  const [toFilter, setToFilter] = useState('')
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (
+    currentPage = page,
+    currentPageSize = pageSize,
+    currentFrom = fromFilter,
+    currentTo = toFilter,
+  ) => {
     setLoading(true)
     try {
       const [versionRes, compatibilityRes] = await Promise.all([
-        api.get('/api/version').catch(() => ({ data: [] })),
-        api.get('/api/compatibility'),
+        api.get('/api/version', { params: { page: 0, size: 200, sortBy: 'releaseDate', sortDir: 'desc' } }).catch(() => ({ data: [] })),
+        api.get('/api/compatibility', {
+          params: {
+            page: currentPage - 1,
+            size: currentPageSize,
+            sortBy: 'id',
+            sortDir: 'desc',
+            ...(currentFrom ? { fromVersion: currentFrom } : {}),
+            ...(currentTo ? { toVersion: currentTo } : {}),
+          },
+        }),
       ])
       setVersions(Array.isArray(versionRes.data) ? versionRes.data : versionRes.data?.content || [])
-      setRows(Array.isArray(compatibilityRes.data) ? compatibilityRes.data : compatibilityRes.data?.content || [])
+      if (Array.isArray(compatibilityRes.data)) {
+        setRows(compatibilityRes.data)
+        setTotalItems(compatibilityRes.data.length)
+      } else {
+        setRows(Array.isArray(compatibilityRes.data?.content) ? compatibilityRes.data.content : [])
+        setTotalItems(compatibilityRes.data?.totalElements ?? 0)
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [fromFilter, page, pageSize, toFilter])
 
   useEffect(() => {
-    fetchData()
-  }, [])
-
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
-    if (page > totalPages) {
-      setPage(totalPages)
-    }
-  }, [page, pageSize, rows.length])
+    const timeout = setTimeout(() => {
+      fetchData(page, pageSize, fromFilter, toFilter)
+    }, 250)
+    return () => clearTimeout(timeout)
+  }, [fetchData, page, pageSize, fromFilter, toFilter])
 
   const versionOptions = useMemo(() => versions.map((version) => version.versionCode || version.versionName).filter(Boolean), [versions])
-  const paginatedRows = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return rows.slice(start, start + pageSize)
-  }, [rows, page, pageSize])
+  const paginatedRows = useMemo(() => rows, [rows])
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target
@@ -98,7 +114,7 @@ function CompatibilityPage() {
     try {
       await api.delete(`/api/compatibility/${id}`)
       toast.success('Compatibility rule deleted')
-      await fetchData()
+      await fetchData(page, pageSize, fromFilter, toFilter)
     } catch {
       toast.error('Delete endpoint unavailable or request failed')
     }
@@ -129,6 +145,28 @@ function CompatibilityPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <h3 className="text-base font-semibold">Compatibility Matrix</h3>
+        <div className="mt-4 flex flex-col gap-2 md:flex-row">
+          <input
+            type="text"
+            value={fromFilter}
+            onChange={(event) => {
+              setFromFilter(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Filter From Version"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800"
+          />
+          <input
+            type="text"
+            value={toFilter}
+            onChange={(event) => {
+              setToFilter(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Filter To Version"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800"
+          />
+        </div>
 
         {loading ? (
           <div className="mt-4"><LoadingSpinner label="Loading compatibility matrix..." /></div>
@@ -164,7 +202,7 @@ function CompatibilityPage() {
               </tbody>
             </table>
             <Pagination
-              totalItems={rows.length}
+              totalItems={totalItems}
               page={page}
               pageSize={pageSize}
               onPageChange={setPage}

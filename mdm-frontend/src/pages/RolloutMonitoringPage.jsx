@@ -9,41 +9,47 @@ function RolloutMonitoringPage() {
   const [rows, setRows] = useState([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
 
-  const fetchRows = async (selectedScheduleId) => {
+  const fetchRows = async (selectedScheduleId, currentPage, currentPageSize) => {
     if (!selectedScheduleId) {
       setRows([])
+      setTotalItems(0)
       return
     }
 
     setLoading(true)
     try {
-      const response = await api.get('/api/device-update', { params: { scheduleId: selectedScheduleId } })
-      setRows(Array.isArray(response.data) ? response.data : response.data?.content || [])
+      const response = await api.get('/api/device-update', {
+        params: {
+          scheduleId: selectedScheduleId,
+          page: currentPage - 1,
+          size: currentPageSize,
+          sortBy: 'id',
+          sortDir: 'desc',
+        },
+      })
+      if (Array.isArray(response.data)) {
+        setRows(response.data)
+        setTotalItems(response.data.length)
+        return
+      }
+      setRows(Array.isArray(response.data?.content) ? response.data.content : [])
+      setTotalItems(response.data?.totalElements ?? 0)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchRows(scheduleId)
-  }, [scheduleId])
+    fetchRows(scheduleId, page, pageSize)
+  }, [scheduleId, page, pageSize])
 
   useEffect(() => {
     setPage(1)
   }, [scheduleId])
 
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
-    if (page > totalPages) {
-      setPage(totalPages)
-    }
-  }, [page, pageSize, rows.length])
-
-  const paginatedRows = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return rows.slice(start, start + pageSize)
-  }, [rows, page, pageSize])
+  const paginatedRows = useMemo(() => rows, [rows])
 
   return (
     <section className="space-y-4">
@@ -78,7 +84,7 @@ function RolloutMonitoringPage() {
             </tbody>
           </table>
           <Pagination
-            totalItems={rows.length}
+            totalItems={totalItems}
             page={page}
             pageSize={pageSize}
             onPageChange={setPage}

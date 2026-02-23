@@ -11,8 +11,8 @@ function DeviceTimelinePage() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await api.get('/api/device')
-        setDevices(Array.isArray(response.data) ? response.data : [])
+        const response = await api.get('/api/device', { params: { page: 0, size: 200, sortBy: 'id', sortDir: 'asc' } })
+        setDevices(Array.isArray(response.data) ? response.data : response.data?.content || [])
       } catch {
         setDevices([])
       }

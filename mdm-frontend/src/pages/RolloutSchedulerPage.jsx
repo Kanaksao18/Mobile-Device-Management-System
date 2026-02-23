@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -29,37 +29,43 @@ function RolloutSchedulerPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const [statusFilter, setStatusFilter] = useState('')
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (currentPage = page, currentPageSize = pageSize, currentStatus = statusFilter) => {
     setLoading(true)
     try {
       const [versionRes, scheduleRes] = await Promise.all([
-        api.get('/api/version').catch(() => ({ data: [] })),
-        api.get('/api/schedule').catch(() => ({ data: [] })),
+        api.get('/api/version', { params: { page: 0, size: 200, sortBy: 'releaseDate', sortDir: 'desc' } }).catch(() => ({ data: [] })),
+        api.get('/api/schedule', {
+          params: {
+            page: currentPage - 1,
+            size: currentPageSize,
+            sortBy: 'scheduledTime',
+            sortDir: 'desc',
+            ...(currentStatus ? { status: currentStatus } : {}),
+          },
+        }).catch(() => ({ data: [] })),
       ])
       setVersions(Array.isArray(versionRes.data) ? versionRes.data : versionRes.data?.content || [])
-      setSchedules(Array.isArray(scheduleRes.data) ? scheduleRes.data : scheduleRes.data?.content || [])
+      if (Array.isArray(scheduleRes.data)) {
+        setSchedules(scheduleRes.data)
+        setTotalItems(scheduleRes.data.length)
+      } else {
+        setSchedules(Array.isArray(scheduleRes.data?.content) ? scheduleRes.data.content : [])
+        setTotalItems(scheduleRes.data?.totalElements ?? 0)
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, pageSize, statusFilter])
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchData(page, pageSize, statusFilter)
+  }, [fetchData, page, pageSize, statusFilter])
 
   const versionOptions = useMemo(() => versions.map((version) => version.versionCode || version.versionName).filter(Boolean), [versions])
-  const paginatedSchedules = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return schedules.slice(start, start + pageSize)
-  }, [page, pageSize, schedules])
-
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(schedules.length / pageSize))
-    if (page > totalPages) {
-      setPage(totalPages)
-    }
-  }, [page, pageSize, schedules.length])
+  const paginatedSchedules = useMemo(() => schedules, [schedules])
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -142,6 +148,23 @@ function RolloutSchedulerPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <h3 className="text-base font-semibold">Rollout List</h3>
+        <div className="mt-4">
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value)
+              setPage(1)
+            }}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800"
+          >
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="SCHEDULED">SCHEDULED</option>
+            <option value="PENDING_APPROVAL">PENDING_APPROVAL</option>
+            <option value="REJECTED">REJECTED</option>
+            <option value="ROLLED_BACK">ROLLED_BACK</option>
+          </select>
+        </div>
 
         {loading ? (
           <div className="mt-4"><LoadingSpinner label="Loading rollout schedules..." /></div>
@@ -184,7 +207,7 @@ function RolloutSchedulerPage() {
               </tbody>
             </table>
             <Pagination
-              totalItems={schedules.length}
+              totalItems={totalItems}
               page={page}
               pageSize={pageSize}
               onPageChange={setPage}

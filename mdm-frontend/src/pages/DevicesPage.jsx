@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Pagination from '../components/Pagination'
@@ -7,50 +7,49 @@ function DevicesPage() {
   const [loading, setLoading] = useState(true)
   const [devices, setDevices] = useState([])
   const [search, setSearch] = useState('')
-  const [region, setRegion] = useState('all')
+  const [region, setRegion] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+
+  const fetchDevices = async (currentPage, currentPageSize, currentSearch, currentRegion) => {
+    setLoading(true)
+    try {
+      const params = {
+        page: currentPage - 1,
+        size: currentPageSize,
+        sortBy: 'lastOpenTime',
+        sortDir: 'desc',
+      }
+      if (currentSearch.trim()) {
+        params.search = currentSearch.trim()
+      }
+      if (currentRegion.trim()) {
+        params.region = currentRegion.trim()
+      }
+      const response = await api.get('/api/device', { params })
+      if (Array.isArray(response.data)) {
+        setDevices(response.data)
+        setTotalItems(response.data.length)
+        return
+      }
+      setDevices(Array.isArray(response.data?.content) ? response.data.content : [])
+      setTotalItems(response.data?.totalElements ?? 0)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchDevices = async () => {
-      setLoading(true)
-      try {
-        const response = await api.get('/api/device')
-        setDevices(Array.isArray(response.data) ? response.data : response.data?.content || [])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchDevices()
-  }, [])
-
-  const regions = useMemo(() => ['all', ...new Set(devices.map((device) => device.region).filter(Boolean))], [devices])
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return devices.filter((device) => {
-      const matchRegion = region === 'all' || (device.region || '').toLowerCase() === region.toLowerCase()
-      const matchSearch = !query || [device.imei, device.model, device.os, device.region, device.appVersion, device.lastOpenTime].filter(Boolean).join(' ').toLowerCase().includes(query)
-      return matchRegion && matchSearch
-    })
-  }, [devices, region, search])
+    const timeout = setTimeout(() => {
+      fetchDevices(page, pageSize, search, region)
+    }, 250)
+    return () => clearTimeout(timeout)
+  }, [page, pageSize, search, region])
 
   useEffect(() => {
     setPage(1)
   }, [search, region])
-
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-    if (page > totalPages) {
-      setPage(totalPages)
-    }
-  }, [filtered.length, page, pageSize])
-
-  const paginatedDevices = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filtered.slice(start, start + pageSize)
-  }, [filtered, page, pageSize])
 
   if (loading) {
     return <LoadingSpinner label="Loading devices..." />
@@ -61,13 +60,13 @@ function DevicesPage() {
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 md:flex-row md:items-center">
         <input type="text" placeholder="Search by IMEI, model, OS, region, version" value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800" />
 
-        <select value={region} onChange={(event) => setRegion(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800">
-          {regions.map((entry) => (
-            <option key={entry} value={entry}>
-              {entry === 'all' ? 'All Regions' : entry}
-            </option>
-          ))}
-        </select>
+        <input
+          type="text"
+          placeholder="Filter by region"
+          value={region}
+          onChange={(event) => setRegion(event.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800"
+        />
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -80,7 +79,7 @@ function DevicesPage() {
             </tr>
           </thead>
           <tbody>
-            {paginatedDevices.map((device, index) => (
+            {devices.map((device, index) => (
               <tr key={device.id || device.imei || index} className="border-t border-slate-200 dark:border-slate-700">
                 <td className="px-4 py-3">{device.imei || '-'}</td>
                 <td className="px-4 py-3">{device.model || '-'}</td>
@@ -95,7 +94,7 @@ function DevicesPage() {
                 </td>
               </tr>
             ))}
-            {!filtered.length && (
+            {!devices.length && (
               <tr>
                 <td className="px-4 py-6 text-center text-slate-500 dark:text-slate-400" colSpan={7}>No devices found.</td>
               </tr>
@@ -103,7 +102,7 @@ function DevicesPage() {
           </tbody>
         </table>
         <Pagination
-          totalItems={filtered.length}
+          totalItems={totalItems}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}

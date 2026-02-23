@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import api from '../services/api'
 import Pagination from '../components/Pagination'
@@ -8,32 +8,34 @@ function AuditLogsPage() {
   const [rows, setRows] = useState([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
 
   useEffect(() => {
     const fetchAudit = async () => {
       setLoading(true)
       try {
-        const response = await api.get('/api/audit')
-        setRows(Array.isArray(response.data) ? response.data : response.data?.content || [])
+        const response = await api.get('/api/audit', {
+          params: {
+            page: page - 1,
+            size: pageSize,
+            sortBy: 'timestamp',
+            sortDir: 'desc',
+          },
+        })
+        if (Array.isArray(response.data)) {
+          setRows(response.data)
+          setTotalItems(response.data.length)
+          return
+        }
+        setRows(Array.isArray(response.data?.content) ? response.data.content : [])
+        setTotalItems(response.data?.totalElements ?? 0)
       } finally {
         setLoading(false)
       }
     }
 
     fetchAudit()
-  }, [])
-
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
-    if (page > totalPages) {
-      setPage(totalPages)
-    }
-  }, [page, pageSize, rows.length])
-
-  const paginatedRows = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return rows.slice(start, start + pageSize)
-  }, [rows, page, pageSize])
+  }, [page, pageSize])
 
   if (loading) return <LoadingSpinner label="Loading audit logs..." />
 
@@ -48,7 +50,7 @@ function AuditLogsPage() {
           </tr>
         </thead>
         <tbody>
-          {paginatedRows.map((row, index) => (
+          {rows.map((row, index) => (
             <tr key={row.id || index} className="border-t border-slate-200 dark:border-slate-700">
               <td className="px-4 py-3">{row.actor || '-'}</td>
               <td className="px-4 py-3">{row.action || '-'}</td>
@@ -62,7 +64,7 @@ function AuditLogsPage() {
         </tbody>
       </table>
       <Pagination
-        totalItems={rows.length}
+        totalItems={totalItems}
         page={page}
         pageSize={pageSize}
         onPageChange={setPage}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -19,34 +19,53 @@ function VersionManagementPage() {
   const [formData, setFormData] = useState(initialForm)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const [search, setSearch] = useState('')
+  const [mandatoryFilter, setMandatoryFilter] = useState('all')
 
-  const fetchVersions = async () => {
+  const fetchVersions = useCallback(async (currentPage = page, currentPageSize = pageSize, currentSearch = search, currentMandatory = mandatoryFilter) => {
     setLoading(true)
     try {
-      const response = await api.get('/api/version')
-      setVersions(Array.isArray(response.data) ? response.data : response.data?.content || [])
+      const params = {
+        page: currentPage - 1,
+        size: currentPageSize,
+        sortBy: 'releaseDate',
+        sortDir: 'desc',
+      }
+      if (currentSearch.trim()) {
+        params.search = currentSearch.trim()
+      }
+      if (currentMandatory !== 'all') {
+        params.mandatory = currentMandatory === 'true'
+      }
+      const response = await api.get('/api/version', { params })
+      if (Array.isArray(response.data)) {
+        setVersions(response.data)
+        setTotalItems(response.data.length)
+        return
+      }
+      setVersions(Array.isArray(response.data?.content) ? response.data.content : [])
+      setTotalItems(response.data?.totalElements ?? 0)
     } catch {
       setVersions([])
+      setTotalItems(0)
     } finally {
       setLoading(false)
     }
-  }
+  }, [mandatoryFilter, page, pageSize, search])
 
   useEffect(() => {
-    fetchVersions()
-  }, [])
+    const timeout = setTimeout(() => {
+      fetchVersions(page, pageSize, search, mandatoryFilter)
+    }, 250)
+    return () => clearTimeout(timeout)
+  }, [fetchVersions, page, pageSize, search, mandatoryFilter])
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(versions.length / pageSize))
-    if (page > totalPages) {
-      setPage(totalPages)
-    }
-  }, [page, pageSize, versions.length])
+    setPage(1)
+  }, [search, mandatoryFilter])
 
-  const paginatedVersions = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return versions.slice(start, start + pageSize)
-  }, [versions, page, pageSize])
+  const paginatedVersions = useMemo(() => versions, [versions])
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target
@@ -89,6 +108,24 @@ function VersionManagementPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <h3 className="text-base font-semibold">Version List</h3>
+        <div className="mt-4 flex flex-col gap-2 md:flex-row">
+          <input
+            type="text"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by code, name, OS"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800"
+          />
+          <select
+            value={mandatoryFilter}
+            onChange={(event) => setMandatoryFilter(event.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-purple-500 focus:ring-2 dark:border-slate-600 dark:bg-slate-800"
+          >
+            <option value="all">All Types</option>
+            <option value="true">Mandatory</option>
+            <option value="false">Optional</option>
+          </select>
+        </div>
         {loading ? (
           <div className="mt-4"><LoadingSpinner label="Loading versions..." /></div>
         ) : (
@@ -117,7 +154,7 @@ function VersionManagementPage() {
               </tbody>
             </table>
             <Pagination
-              totalItems={versions.length}
+              totalItems={totalItems}
               page={page}
               pageSize={pageSize}
               onPageChange={setPage}
